@@ -50,7 +50,8 @@ offline queue, background pre-download of upcoming chapters, automatic RTL.
 - Progress bar (bytes, when the server reports the file size) and a completion notification;
   the window names the **series** and the file, and bulk downloads show "(i of N)".
 - **Pause / Resume**, **Cancel** (removes the partial file and stops the whole queue,
-  subscriptions included) and **Hide** (the window closes, the download keeps going).
+  subscriptions included) and **Hide** (the window closes, the download keeps going; it stays
+  hidden for the rest of the queue, so a long subscription sync won't reopen it on every file).
   **komix → Active downloads** brings a hidden download window back.
 - Filename template (`{series}`, `{title}`, `{number}`), per-series subfolders, configurable stall
   and total timeouts, retry with backoff.
