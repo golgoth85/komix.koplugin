@@ -2,9 +2,9 @@
 
 > **Honest note first.** `komix` is a **merge of two existing plugins** — `kokomga` and `komga` —
 > with a few features added on top. It is **100% vibe coded**: written entirely by an AI assistant
-> (Claude), directed and tested by a human. It works, and it is tested (see [Status](#status)), but
-> it has only been run on one Komga server so far. Read the code before trusting it with a library
-> you care about.
+> (**DeepSeek Flash 4.1**, driven through the Claude Code CLI), directed and tested by a human. It
+> works, and it is tested (see [Status](#status)), but it has only been run on one Komga server so
+> far. Read the code before trusting it with a library you care about.
 
 A client for [Komga](https://komga.org) (a comics/manga media server) that runs inside
 [KOReader](https://koreader.rocks): browse the server library, download books locally, and keep
