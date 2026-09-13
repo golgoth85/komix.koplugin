@@ -2,87 +2,87 @@
 
 ## [1.0.4] - 2026-09-13
 
-### Aggiunto
-- **Download gestiti in background**: il trasferimento avviene in un processo separato, quindi
-  KOReader resta utilizzabile mentre scarica (prima l'interfaccia si bloccava fino alla fine).
-- **Pausa / Riprendi e Annulla** dalla finestra di download. La pausa congela davvero il
-  trasferimento (il server smette di inviare); l'annullamento elimina il file parziale e ferma
-  l'intera coda, abbonamenti compresi.
-- **Minimizza**: la finestra si chiude ma il download continua. La voce **komix → Active
-  downloads** la richiama (è disabilitata quando non c'è nulla in corso).
-- **Nome della serie nella finestra di download** (es. "Vagabond - 0003.cbz"), utile nei
-  download multipli dove il solo nome file non dice a quale serie appartiene.
+### Added
+- **Downloads run in the background**: the transfer happens in a separate process, so KOReader
+  stays usable while downloading (previously the UI froze until it finished).
+- **Pause / Resume and Cancel** in the download window. Pause genuinely freezes the transfer
+  (the server stops sending); Cancel removes the partial file and stops the whole queue,
+  subscriptions included.
+- **Hide**: the window closes but the download keeps going. **komix → Active downloads** brings
+  it back (disabled when nothing is running).
+- **Series name in the download window** (e.g. "Vagabond - 0003.cbz"), useful for bulk downloads
+  where the file name alone doesn't say which series it belongs to.
 
-### Cambiato
-- **Icona di ricerca spostata nell'angolo in basso a destra**: prima era centrata nella barra
-  inferiore, accanto alle doppie frecce di pagina.
+### Changed
+- **Search icon moved to the bottom-right corner**: it used to be centred in the bottom bar,
+  next to the page arrows.
 
-### Corretto
-- **Finestra di download non ridisegnata**: alla chiusura (fine download o annullamento) la
-  finestra restava visibile perché il refresh veniva richiesto senza modalità di aggiornamento.
+### Fixed
+- **Download window not redrawn**: on close (download finished or cancelled) the window stayed
+  on screen because the refresh was requested without a refresh mode.
 
 ## [1.0.3] - 2026-09-13
 
-### Corretto
-- **Avviso spurio "nessuna cartella di download"**: sfogliando i libri (per sapere quali sono
-  già scaricati) il plugin mostrava un errore quando non era configurata una cartella di
-  download. Ora la verifica del percorso è silenziosa; l'avviso compare solo quando si tenta
-  davvero un download. I download di gruppo/abbonamento non mostrano l'avviso ripetutamente.
+### Fixed
+- **Spurious "no download folder" warning**: while browsing books (to tell which ones are
+  already downloaded) the plugin showed an error when no download folder was configured. The
+  path check is now silent; the warning only appears when a download is actually attempted.
+  Bulk and subscription downloads no longer show the warning repeatedly.
 
-### Note
-- Prima release verificata **su KOReader reale** (build Linux x86_64 in ambiente headless):
-  navigazione, copertine, conteggi, nomi serie e cartella di download testati a schermo.
+### Notes
+- First release verified **on real KOReader** (Linux x86_64 build, headless): browsing, covers,
+  counts, series names and the download folder were tested on screen.
 
 ## [1.0.2] - 2026-09-13
 
-### Corretto
-- **Icona di ricerca sbagliata**: il nome `search` non esiste tra le icone di KOReader, quindi
-  veniva mostrata l'icona di fallback (triangolo con "!"). Ora si usa `appbar.search`.
-- **Sovrapposizione dei pulsanti**: il menù opzioni torna in alto a sinistra (slot previsto dal
-  Menu, come nell'OPDS nativo) e la ricerca si sposta nella barra in basso a destra. Così il
-  pulsante opzioni non finisce più sopra la ✕ di chiusura.
+### Fixed
+- **Wrong search icon**: the name `search` doesn't exist in KOReader, so the fallback icon
+  (a triangle with "!") was shown. It now uses `appbar.search`.
+- **Overlapping buttons**: the options menu goes back to the top-left (the slot the Menu
+  reserves, as in native OPDS) and search moves to the bottom-right bar. The options button no
+  longer ends up over the ✕ close button.
 
-### Aggiunto
-- **Barra di caricamento durante il download**: dialogo con barra di avanzamento (byte scaricati
-  se il server fornisce la dimensione del file, altrimenti solo stato + nome file). Nei download
-  multipli il sottotitolo mostra anche "(i di N)".
-- **Conferma di download completato**: notifica a comparsa per ogni file scaricato
-  ("Scaricato: …"), con riepilogo finale per i download in blocco.
+### Added
+- **Progress bar while downloading**: a dialog with a progress bar (bytes downloaded when the
+  server reports the file size, otherwise just status and file name). For bulk downloads the
+  subtitle also shows "(i of N)".
+- **Download-complete notification**: a pop-up per downloaded file ("Downloaded: …"), with a
+  final summary for bulk downloads.
 
 ## [1.0.1] - 2026-09-13
 
-### Corretto
-- **Barra del titolo**: il pulsante opzioni non si sovrappone più alla ricerca. La ricerca resta
-  a sinistra (posizione standard), le opzioni vanno a destra.
-- **Elenchi senza copertine** (home, librerie, collezioni): densità compatta come il Menu standard
-  di KOReader, così stanno in una sola pagina; la dimensione pagina lato server è allineata a
-  quella a schermo (prima potevano disallinearsi).
-- **Read list e collezioni**: il conteggio non mostra più `(0)` — se il server non espone
-  `bookCount`/`seriesCount` si usa la lunghezza di `bookIds`/`seriesIds`.
-- **Read list**: ogni libro mostra anche il nome della serie.
-- Corretto uno shadowing della funzione di traduzione `_` dentro i cicli `for _,` (poteva dare
-  errore aprendo le opzioni con abbonamenti presenti).
+### Fixed
+- **Title bar**: the options button no longer overlaps search. Search stays on the left
+  (the standard position), options move to the right.
+- **Coverless lists** (home, libraries, collections): compact density like KOReader's standard
+  Menu, so they fit on a single page; the server-side page size now matches the on-screen one
+  (they could get out of sync before).
+- **Read lists and collections**: the count no longer shows `(0)` — when the server doesn't
+  expose `bookCount`/`seriesCount`, the length of `bookIds`/`seriesIds` is used instead.
+- **Read lists**: each book also shows its series name.
+- Fixed shadowing of the translation function `_` inside `for _,` loops (it could error when
+  opening the options with subscriptions present).
 
-### Aggiunto
-- **Opzioni → Home screen**: mostra/nascondi ogni voce della schermata principale (es. On Deck,
-  Recently Added Books).
+### Added
+- **Options → Home screen**: show/hide each home-screen entry (e.g. On Deck, Recently Added
+  Books).
 
 ## [1.0.0] - 2026-09-13
 
-Prima versione: fusione di `kokomga` (v2.1.0) e `komga` (v2026.08.31.1).
+First release: a merge of `kokomga` (v2.1.0) and `komga` (v2026.08.31.1).
 
-### Aggiunto
-- Ricerca per serie, dalla schermata principale e dalla barra del titolo (da `komga`).
-- Navigazione di **collezioni**, **read list** (con copertina) e **one-shot**.
-- **Abbonamenti** a read list / collezioni: download automatico dei nuovi fumetti, avviabile a
-  mano o automaticamente al ritorno online.
-- Metadati: fallback della descrizione dalla serie; scelta degli autori
-  (disegnatore / scrittore / entrambi / nessuno).
-- Download: template del nome, timeout di stallo e totale, retry con backoff (da `komga`).
-- Selettore della cartella di download (PathChooser).
+### Added
+- Series search, from the home screen and the title bar (from `komga`).
+- Navigation of **collections**, **read lists** (with cover) and **one-shots**.
+- **Subscriptions** to read lists / collections: automatic download of new comics, triggered
+  manually or automatically when back online.
+- Metadata: description fallback from the series; author selection
+  (artist / writer / both / none).
+- Downloads: filename template, stall and total timeouts, retry with backoff (from `komga`).
+- Download folder picker (PathChooser).
 
-### Ereditato da kokomga
-- Vista lista e griglia con copertine e badge, selezione multipla e download in blocco.
-- Sincronizzazione dei progressi via KOSync, riconoscimento multi-livello dei libri.
-- Download atomico, coda offline, pre-download in background, RTL automatico.
-- Cache copertine, i18n, azioni dispatcher (ora `komix_*`).
+### Inherited from kokomga
+- List and grid views with covers and badges, multi-select and bulk download.
+- Reading-progress sync via KOSync, multi-layer book recognition.
+- Atomic downloads, offline queue, background pre-download, automatic RTL.
+- Cover cache, i18n, dispatcher actions (now `komix_*`).
