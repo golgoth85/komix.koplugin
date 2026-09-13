@@ -46,8 +46,12 @@ books. Multi-layer book matching (cache → sidecar → metadata), atomic `.part
 offline queue, background pre-download of upcoming chapters, automatic RTL.
 
 **Downloads**
+- Downloads run in a **separate process**, so KOReader stays responsive while they transfer.
 - Progress bar (bytes, when the server reports the file size) and a completion notification;
-  bulk downloads show "(i of N)".
+  the window names the **series** and the file, and bulk downloads show "(i of N)".
+- **Pause / Resume**, **Cancel** (removes the partial file and stops the whole queue,
+  subscriptions included) and **Hide** (the window closes, the download keeps going).
+  **komix → Active downloads** brings a hidden download window back.
 - Filename template (`{series}`, `{title}`, `{number}`), per-series subfolders, configurable stall
   and total timeouts, retry with backoff.
 
@@ -89,8 +93,9 @@ Honest picture:
 
 - **Verified on real KOReader** (Linux x86_64 build, headless, driven with a mock Komga server that
   serves covers and a fake catalogue): browsing, covers, search, download with progress bar,
-  metadata, counts, badges, and the subscription logic. The test suite is 100+ assertions and is
-  run with KOReader's own LuaJIT.
+  pause (progress actually freezes) / resume / cancel (partial file removed) / hide + recall from
+  "Active downloads", metadata, counts, badges, and the subscription logic. The test suite is 100+
+  assertions and is run with KOReader's own LuaJIT.
 - **Downloaded files were checked** for integrity, and the metadata sidecars were inspected
   (series-description fallback and the "artist only" author filter both behave as intended).
 - **Not yet tested on physical devices.** Gestures, RTL, suspend/resume and large downloads on a

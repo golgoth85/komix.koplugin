@@ -10,39 +10,6 @@ local Metadata = require("komix/core/metadata")
 
 local KomixSync = {}
 
--- ---------------------------------------------------------------------------
--- Download progress UI (best-effort: older KOReader builds may lack these widgets)
--- ---------------------------------------------------------------------------
-
--- Opens a modal progress dialog. `max` = total bytes when known; when nil the
--- progress bar is hidden and only the title/subtitle show.
-local function openProgressDialog(title, subtitle, max)
-    local ok, ProgressbarDialog = pcall(require, "ui/widget/progressbardialog")
-    if not ok or not ProgressbarDialog then return nil end
-    local dialog
-    ok = pcall(function()
-        dialog = ProgressbarDialog:new{
-            title = title,
-            subtitle = subtitle,
-            progress_max = max,
-            refresh_time_seconds = 1,
-        }
-    end)
-    if not ok or not dialog then return nil end
-    UIManager:show(dialog)
-    return dialog
-end
-
-local function reportProgress(dialog, value)
-    if not dialog or not value then return end
-    pcall(function() dialog:reportProgress(value) end)
-end
-
-local function closeProgressDialog(dialog)
-    if not dialog then return end
-    pcall(function() dialog:close() end)
-end
-
 -- Confirmation toast after a successful download, falling back to InfoMessage.
 local function notifyDownloaded(plugin, text)
     local ok, Notification = pcall(require, "ui/widget/notification")
@@ -55,11 +22,27 @@ local function notifyDownloaded(plugin, text)
     plugin:notify(text, "info")
 end
 
+-- POSIX signal numbers (Linux/Android: the platforms KOReader ships on).
+local SIGCONT, SIGSTOP = 18, 19
+
+-- Send a signal to the download subprocess and its group. The group matters:
+-- runInSubProcess() puts the child in its own group (setpgid(0,0)), so -pid
+-- reaches any helper it might spawn.
+local function signalSubProcess(pid, sig)
+    local ok, ffi = pcall(require, "ffi")
+    if not ok then return false end
+    pcall(require, "ffi/posix_h")  -- declares kill() for ffi.C
+    return pcall(function() return ffi.C.kill(-pid, sig) end)
+end
+
 function KomixSync:new(plugin)
     local o = {
         plugin = plugin,
         bg_processes = {},
-        bg_collector_scheduled = false
+        bg_collector_scheduled = false,
+        queue = {},              -- downloads waiting for the current one to end
+        current = nil,           -- { book, paths, pid, paused, dialog, ... }
+        cancel_sequence = false, -- set by cancel, consumed by downloadBooksSeq
     }
     return setmetatable(o, { __index = self })
 end
@@ -867,80 +850,310 @@ function KomixSync:downloadBook(book, series_title, on_success_callback, on_fail
     local final_dir = local_path:match("(.*)/[^/]+")
     util.makePath(final_dir .. "/")
 
-    logger.info("KomixSync: Starting download of book", book.id, "to", local_path)
+    logger.info("KomixSync: Queued download of book", book.id, "to", local_path)
 
-    -- Progress: bytes when we can learn the size, otherwise just a status dialog.
+    -- Lead with the series when there is one: in a bulk download the file name
+    -- alone doesn't tell which series is being fetched.
+    local series = series_title or book.seriesTitle
     local subtitle = filename
+    if series and series ~= "" then
+        subtitle = series .. " - " .. filename
+    end
     if ctx and ctx.total and ctx.total > 1 then
-        subtitle = T(_("%1 (%2 of %3)"), filename, ctx.index or 1, ctx.total)
+        subtitle = subtitle .. " " .. T(_("(%1 of %2)"), ctx.index or 1, ctx.total)
     end
-    local size = nil
-    if self.plugin.api.get_file_size then
-        local size_ok, s = pcall(function() return self.plugin.api:get_file_size(book.id) end)
-        if size_ok then size = s end
+
+    table.insert(self.queue, {
+        book = book,
+        series_title = series_title,
+        filename = filename,
+        local_path = local_path,
+        final_dir = final_dir,
+        subtitle = subtitle,
+        size = self:getRemoteFileSize(book),
+        silent = ctx.silent,
+        on_success_callback = on_success_callback,
+        on_failure_callback = on_failure_callback,
+    })
+    self:_pumpQueue()
+end
+
+-- Size in bytes of the remote file, or nil when the server doesn't report it
+-- (in that case the progress dialog shows a byte counter with no bar).
+function KomixSync:getRemoteFileSize(book)
+    if not self.plugin.api or not self.plugin.api.get_file_size then return nil end
+    local ok, size = pcall(function() return self.plugin.api:get_file_size(book.id) end)
+    if ok then return size end
+    return nil
+end
+
+-- ---------------------------------------------------------------------------
+-- Download manager: background, pausable, cancellable
+-- ---------------------------------------------------------------------------
+-- The transfer runs in a child process so the parent UI stays responsive: it
+-- only polls the .part file size (progress) and the child's exit status. The
+-- child's pid is the handle for pause (SIGSTOP), resume (SIGCONT) and cancel.
+
+function KomixSync:hasActiveDownload()
+    return self.current ~= nil
+end
+
+function KomixSync:_pumpQueue()
+    if self.current then return end
+    local rec = table.remove(self.queue, 1)
+    if not rec then return end
+    self:_startDownload(rec)
+end
+
+function KomixSync:_startDownload(rec)
+    local ffiutil = require("ffi/util")
+    local JSON = require("json")
+    local os = require("os")
+
+    rec.tmp_path = rec.local_path .. ".part"
+    pcall(os.remove, rec.tmp_path)
+
+    local api = self.plugin.api
+    local book_id = rec.book.id
+    local tmp_path = rec.tmp_path
+
+    local pid, parent_read_fd = ffiutil.runInSubProcess(function(child_pid, child_write_fd)
+        local ok, err = api:download_book(book_id, tmp_path)
+        ffiutil.writeToFD(child_write_fd, JSON.encode({ ok = ok and true or false, err = err }), true)
+    end, true)
+
+    if not pid then
+        logger.err("KomixSync: Failed to fork download subprocess")
+        if not rec.silent then
+            self.plugin:notify(self.plugin.i18n._("Failed to start download"), "error")
+        end
+        if rec.on_failure_callback then
+            UIManager:nextTick(function() rec.on_failure_callback("fork failed") end)
+        end
+        return
     end
-    local progress = openProgressDialog(_("Downloading"), subtitle, size)
 
-    local tmp_path = local_path .. ".part"
+    logger.info("KomixSync: Download subprocess started. PID: " .. tostring(pid))
 
-    local UIManager = require("ui/uimanager")
-    UIManager:nextTick(function()
-        local success, err = self.plugin.api:download_book(book.id, tmp_path, function(bytes)
-            reportProgress(progress, bytes)
-        end)
-        closeProgressDialog(progress)
-        if success then
-            logger.info("KomixSync: Download successful for", local_path)
-            notifyDownloaded(self.plugin, T(_("Downloaded: %1"), filename))
-            self.plugin.settings.matched_books_cache[local_path] = book.id
-            self.plugin:saveSettings()
-            
-            pcall(save_book_metadata, local_path, book, series_title, self:metadataContext())
-            
-            -- Move file into place after sidecar metadata is fully written
-            local os = require("os")
-            os.rename(tmp_path, local_path)
-            
-            -- Download series cover if missing and downloading to a subdir
-            self:downloadSeriesCoverIfMissing(book, final_dir, series_title)
-            
-            if on_success_callback then
-                UIManager:nextTick(function()
-                    on_success_callback(local_path)
-                end)
-            end
-            
-            -- Tell FileBrowser to refresh directory and reload file items
-            UIManager:nextTick(function()
-                pcall(function()
-                    local BookInfoManager = require("plugins/coverbrowser.koplugin/bookinfomanager")
-                    if BookInfoManager and BookInfoManager.deleteBookInfo then
-                        BookInfoManager:deleteBookInfo(local_path)
-                    end
-                end)
-                local ok, FileManager = pcall(require, "apps/filemanager/filemanager")
-                if ok and FileManager.instance then
-                    if FileManager.instance.file_chooser and FileManager.instance.file_chooser.resetBookInfoCache then
-                        pcall(function() FileManager.instance.file_chooser.resetBookInfoCache(local_path) end)
-                    end
-                    FileManager.instance:onRefresh()
-                end
-            end)
-        else
-            logger.err("KomixSync: Download failed", tostring(err))
+    rec.pid = pid
+    rec.parent_read_fd = parent_read_fd
+    rec.paused = false
+    self.current = rec
+    UIManager:preventStandby()
+
+    self:_showDialog(rec)
+    self:_schedulePoll()
+end
+
+function KomixSync:_showDialog(rec)
+    local _ = self.plugin.i18n._
+    local DownloadDialog = require("komix/ui/download_dialog")
+    rec.dialog = DownloadDialog:new{
+        title = _("Downloading"),
+        subtitle = rec.subtitle,
+        status = rec.size and "" or _("Starting..."),
+        percentage = rec.size and 0 or nil,
+        paused = rec.paused,
+        on_pause = function() self:togglePause() end,
+        on_cancel = function() self:cancelCurrent() end,
+        on_minimize = function() self:minimizeCurrent() end,
+    }
+    rec.dialog:show()
+end
+
+function KomixSync:_schedulePoll()
+    if self._poll_pending then return end
+    self._poll_pending = true
+    UIManager:scheduleIn(1, function()
+        self._poll_pending = false
+        self:_pollDownload()
+    end)
+end
+
+function KomixSync:_pollDownload()
+    local rec = self.current
+    if not rec then return end
+    local ffiutil = require("ffi/util")
+
+    if ffiutil.isSubProcessDone(rec.pid) then
+        local payload = rec.parent_read_fd and ffiutil.readAllFromFD(rec.parent_read_fd) or ""
+        self.current = nil
+        UIManager:allowStandby()
+        self:_finishDownload(rec, payload)
+        self:_pumpQueue()
+        return
+    end
+
+    if not rec.paused and rec.dialog then
+        local lfs = require("libs/libkoreader-lfs")
+        rec.dialog:setProgress(lfs.attributes(rec.tmp_path, "size") or 0, rec.size)
+    end
+    self:_schedulePoll()
+end
+
+function KomixSync:_finishDownload(rec, payload)
+    local _ = self.plugin.i18n._
+    local T = self.plugin.i18n.T
+    local JSON = require("json")
+    local os = require("os")
+
+    if rec.dialog then
+        rec.dialog:close()
+        rec.dialog = nil
+    end
+
+    local ok, result = pcall(JSON.decode, payload or "")
+    local success = ok and type(result) == "table" and result.ok
+    local err = (ok and type(result) == "table") and result.err or "download failed"
+
+    if not success then
+        logger.err("KomixSync: Download failed", tostring(err))
+        pcall(os.remove, rec.tmp_path)
+        if not rec.cancelled then
             self.plugin:notify(T(_("Failed: %1"), tostring(err)), "error")
-            if on_failure_callback then
-                UIManager:nextTick(function()
-                    on_failure_callback(tostring(err))
-                end)
+        end
+        if rec.on_failure_callback then
+            UIManager:nextTick(function() rec.on_failure_callback(tostring(err)) end)
+        end
+        return
+    end
+
+    logger.info("KomixSync: Download successful for", rec.local_path)
+    notifyDownloaded(self.plugin, T(_("Downloaded: %1"), rec.filename))
+    self.plugin.settings.matched_books_cache[rec.local_path] = rec.book.id
+    self.plugin:saveSettings()
+
+    pcall(save_book_metadata, rec.local_path, rec.book, rec.series_title, self:metadataContext())
+
+    -- Move file into place after sidecar metadata is fully written
+    os.rename(rec.tmp_path, rec.local_path)
+
+    -- Download series cover if missing and downloading to a subdir
+    self:downloadSeriesCoverIfMissing(rec.book, rec.final_dir, rec.series_title)
+
+    if rec.on_success_callback then
+        UIManager:nextTick(function()
+            rec.on_success_callback(rec.local_path)
+        end)
+    end
+
+    -- Tell FileBrowser to refresh directory and reload file items
+    UIManager:nextTick(function()
+        pcall(function()
+            local BookInfoManager = require("plugins/coverbrowser.koplugin/bookinfomanager")
+            if BookInfoManager and BookInfoManager.deleteBookInfo then
+                BookInfoManager:deleteBookInfo(rec.local_path)
             end
+        end)
+        local fm_ok, FileManager = pcall(require, "apps/filemanager/filemanager")
+        if fm_ok and FileManager.instance then
+            if FileManager.instance.file_chooser and FileManager.instance.file_chooser.resetBookInfoCache then
+                pcall(function() FileManager.instance.file_chooser.resetBookInfoCache(rec.local_path) end)
+            end
+            FileManager.instance:onRefresh()
         end
     end)
+end
+
+-- Pause/resume the transfer. SIGSTOP freezes the child: the TCP window closes
+-- and the server pauses sending until SIGCONT.
+function KomixSync:togglePause()
+    local rec = self.current
+    if not rec or not rec.pid then return end
+    rec.paused = not rec.paused
+    signalSubProcess(rec.pid, rec.paused and SIGSTOP or SIGCONT)
+    logger.info("KomixSync: Download " .. (rec.paused and "paused" or "resumed") .. ": " .. rec.filename)
+
+    -- Rebuild the dialog so the Pause/Resume label and its geometry are
+    -- consistent (Button has no in-place relayout).
+    if rec.dialog then
+        rec.dialog:close()
+        rec.dialog = nil
+        self:_showDialog(rec)
+        local lfs = require("libs/libkoreader-lfs")
+        rec.dialog:setProgress(lfs.attributes(rec.tmp_path, "size") or 0, rec.size)
+    end
+end
+
+-- Kill the running transfer and drop everything still queued: cancelling a
+-- subscription sync must not leave it half-done.
+function KomixSync:cancelCurrent()
+    local rec = self.current
+    if not rec then return end
+    local ffiutil = require("ffi/util")
+    local os = require("os")
+
+    rec.cancelled = true
+    pcall(ffiutil.terminateSubProcess, rec.pid)
+    self.current = nil
+    self.cancel_sequence = true
+    self.queue = {}
+    UIManager:allowStandby()
+
+    if rec.dialog then
+        rec.dialog:close()
+        rec.dialog = nil
+    end
+    pcall(os.remove, rec.tmp_path)
+
+    -- The killed child still has to be reaped (and its pipe closed) or it
+    -- lingers as a zombie.
+    local pid, fd = rec.pid, rec.parent_read_fd
+    local collect
+    collect = function()
+        if not ffiutil.isSubProcessDone(pid) then
+            UIManager:scheduleIn(1, collect)
+            return
+        end
+        if fd then pcall(ffiutil.readAllFromFD, fd) end
+    end
+    UIManager:scheduleIn(1, collect)
+
+    if rec.on_failure_callback then
+        UIManager:nextTick(function() rec.on_failure_callback("cancelled") end)
+    end
+end
+
+-- Hide the progress dialog but keep the transfer running.
+function KomixSync:minimizeCurrent()
+    local rec = self.current
+    if not rec then return end
+    if rec.dialog then
+        rec.dialog:close()
+        rec.dialog = nil
+    end
+    self.plugin:notify(self.plugin.i18n._("Download moved to the background"), "info")
+end
+
+-- Bring the download window back (komix → Active downloads).
+function KomixSync:showActiveDownloads()
+    local _ = self.plugin.i18n._
+    local rec = self.current
+    if not rec then
+        self.plugin:notify(_("No active downloads"), "info")
+        return
+    end
+    if rec.dialog then
+        rec.dialog:refresh()
+        return
+    end
+    self:_showDialog(rec)
+    local lfs = require("libs/libkoreader-lfs")
+    rec.dialog:setProgress(lfs.attributes(rec.tmp_path, "size") or 0, rec.size)
 end
 
 function KomixSync:downloadBooksSeq(books, index, on_done_callback, opts)
     index = index or 1
     opts = opts or {}
+    -- A cancel drops the rest of the queue; stop here and report completion so
+    -- callers (subscriptions) can clear their "running" state.
+    if self.cancel_sequence then
+        self.cancel_sequence = false
+        if on_done_callback then
+            on_done_callback()
+        end
+        return
+    end
     if index > #books then
         if on_done_callback then
             on_done_callback()

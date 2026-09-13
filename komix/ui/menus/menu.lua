@@ -362,6 +362,24 @@ function KomixMenu:createSettingsMenu()
         end
     })
 
+    -- Recall the download window after minimizing it (or when it scrolled away).
+    local function has_active_download()
+        return self.plugin.sync ~= nil and self.plugin.sync:hasActiveDownload()
+    end
+    table.insert(submenu, {
+        text_func = function()
+            return has_active_download() and _("Active downloads") or _("Active downloads: none")
+        end,
+        enabled_func = has_active_download,
+        keep_menu_open = true,
+        callback = function(touchmenu_instance)
+            if touchmenu_instance and touchmenu_instance.onCloseAllMenus then
+                touchmenu_instance:onCloseAllMenus()
+            end
+            self.plugin.sync:showActiveDownloads()
+        end
+    })
+
     return submenu
 end
 

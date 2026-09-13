@@ -64,14 +64,18 @@ local KomixBrowser = KomixListMenu:extend{
     _pagination = nil,  -- { loader, server_page, total_pages, page_size }
 }
 
--- Search button appended to the Menu footer (bottom bar), on the right.
+-- Search button pinned to the bottom-right corner of the Menu footer.
+-- The footer centers page_info, so the two are stacked in a full-width
+-- OverlapGroup: page_info stays centered, the button hugs the right edge.
 -- Uses the footer so it is reachable from every catalog and never collides
 -- with the close button in the title bar.
 function KomixBrowser:installFooterSearchButton()
     if not self.page_info or self.footer_search_btn then return end
     local ok_btn, Button = pcall(require, "ui/widget/button")
-    local ok_span, HorizontalSpan = pcall(require, "ui/widget/horizontalspan")
-    if not (ok_btn and ok_span) then return end
+    local ok_cc, CenterContainer = pcall(require, "ui/widget/container/centercontainer")
+    local ok_og, OverlapGroup = pcall(require, "ui/widget/overlapgroup")
+    local ok_geom, Geom = pcall(require, "ui/geometry")
+    if not (ok_btn and ok_cc and ok_og and ok_geom) then return end
     local Screen = require("device").screen
 
     self.footer_search_btn = Button:new{
@@ -81,8 +85,41 @@ function KomixBrowser:installFooterSearchButton()
         callback = function() self:showSearchDialog() end,
         show_parent = self,
     }
-    table.insert(self.page_info, HorizontalSpan:new{ width = Screen:scaleBySize(6) })
-    table.insert(self.page_info, self.footer_search_btn)
+
+    -- Find the footer BottomContainer (the Menu builds it internally; it's the
+    -- child that currently holds page_info).
+    local frame = self[1]
+    local content = frame and frame[1]
+    local footer
+    if content then
+        for _i, child in ipairs(content) do
+            if child[1] == self.page_info then
+                footer = child
+                break
+            end
+        end
+    end
+    if not footer then return end
+
+    -- CenterContainer gives the button the row's height, so it lines up with
+    -- the page chevrons instead of sticking to the top of the overlap.
+    local row_h = math.max(self.page_info:getSize().h, self.footer_search_btn:getSize().h)
+    local btn_slot = CenterContainer:new{
+        dimen = Geom:new{ w = self.footer_search_btn:getSize().w, h = row_h },
+        self.footer_search_btn,
+    }
+    self.page_info.overlap_align = "center"
+
+    local wrapper = OverlapGroup:new{
+        dimen = Geom:new{ w = self.inner_dimen.w, h = row_h },
+        allow_mirroring = false,
+    }
+    table.insert(wrapper, self.page_info)
+    table.insert(wrapper, btn_slot)
+    btn_slot.overlap_align = "right"
+
+    -- Replace the footer content (page_info is reparented into the wrapper).
+    footer[1] = wrapper
 end
 
 -- Catalog options dialog (view mode, rows/columns, series filter).

@@ -1,5 +1,26 @@
 # Changelog
 
+## [1.0.4] - 2026-09-13
+
+### Aggiunto
+- **Download gestiti in background**: il trasferimento avviene in un processo separato, quindi
+  KOReader resta utilizzabile mentre scarica (prima l'interfaccia si bloccava fino alla fine).
+- **Pausa / Riprendi e Annulla** dalla finestra di download. La pausa congela davvero il
+  trasferimento (il server smette di inviare); l'annullamento elimina il file parziale e ferma
+  l'intera coda, abbonamenti compresi.
+- **Minimizza**: la finestra si chiude ma il download continua. La voce **komix → Active
+  downloads** la richiama (è disabilitata quando non c'è nulla in corso).
+- **Nome della serie nella finestra di download** (es. "Vagabond - 0003.cbz"), utile nei
+  download multipli dove il solo nome file non dice a quale serie appartiene.
+
+### Cambiato
+- **Icona di ricerca spostata nell'angolo in basso a destra**: prima era centrata nella barra
+  inferiore, accanto alle doppie frecce di pagina.
+
+### Corretto
+- **Finestra di download non ridisegnata**: alla chiusura (fine download o annullamento) la
+  finestra restava visibile perché il refresh veniva richiesto senza modalità di aggiornamento.
+
 ## [1.0.3] - 2026-09-13
 
 ### Corretto
