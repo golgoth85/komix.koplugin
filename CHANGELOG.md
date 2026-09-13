@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.0.7] - 2026-09-13
+
+### Added
+- **Subscribe / unsubscribe straight from the catalog you are looking at**: the top-left menu
+  (next to view mode and rows) now offers *Subscribe to this collection* / *this read list* /
+  *this series* — and the matching *Unsubscribe from …* once you are subscribed. No need to go
+  through the Subscriptions menu any more.
+- **Series can be subscribed to**, like read lists and collections: a series subscription keeps
+  every volume of that series downloaded as new ones come out.
+
 ## [1.0.6] - 2026-09-13
 
 ### Added

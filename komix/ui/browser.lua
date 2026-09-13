@@ -122,7 +122,48 @@ function KomixBrowser:installFooterSearchButton()
     footer[1] = wrapper
 end
 
--- Catalog options dialog (view mode, rows/columns, series filter).
+-- Subscribe / unsubscribe entry for the options dialog, or nil for catalogs that
+-- aren't subscribable (a library, a search, the list of all collections, ...).
+-- The catalog carries what it represents via push_opts (sub_kind / sub_id).
+function KomixBrowser:subscriptionMenuItem(opts)
+    if not opts or not opts.sub_kind or not opts.sub_id then return nil end
+    local _ = self.plugin.i18n._
+    local T = self.plugin.i18n.T
+    local subs = self.plugin.subscriptions
+    if not subs then return nil end
+
+    -- One wording per kind, so the entry says exactly what it acts on.
+    local labels = {
+        collection = { on = _("Unsubscribe from this collection"),
+                       off = _("Subscribe to this collection") },
+        readlist   = { on = _("Unsubscribe from this read list"),
+                       off = _("Subscribe to this read list") },
+        series     = { on = _("Unsubscribe from this series"),
+                       off = _("Subscribe to this series") },
+    }
+    local label = labels[opts.sub_kind]
+    if not label then return nil end
+
+    local subscribed = subs:has(opts.sub_kind, opts.sub_id)
+    local name = opts.sub_name or opts.sub_id
+
+    return {
+        text = subscribed and label.on or label.off,
+        align = "left",
+        callback = function()
+            if self.menu_dialog then UIManager:close(self.menu_dialog) end
+            if subscribed then
+                subs:remove(opts.sub_kind, opts.sub_id)
+                self.plugin:notify(T(_("Unsubscribed from %1"), name), "info")
+            else
+                subs:add(opts.sub_kind, opts.sub_id, name)
+                self.plugin:notify(T(_("Subscribed to %1"), name), "info")
+            end
+        end,
+    }
+end
+
+-- Catalog options dialog (view mode, rows/columns, subscription, series filter).
 function KomixBrowser:showOptionsDialog(opts)
     local _ = self.plugin.i18n._
     local ButtonDialog = require("ui/widget/buttondialog")
@@ -203,6 +244,13 @@ function KomixBrowser:showOptionsDialog(opts)
             end,
             align = "left",
         } })
+    end
+
+    -- Subscribe/unsubscribe straight from the catalog you are looking at.
+    local sub_item = self:subscriptionMenuItem(opts)
+    if sub_item then
+        table.insert(buttons, {})
+        table.insert(buttons, { sub_item })
     end
 
     self.menu_dialog = ButtonDialog:new{
@@ -743,6 +791,10 @@ function KomixBrowser:showBooksInSeries(series_id, series_title, read_status)
             series_id = series_id,
             read_status = read_status,
             original_title = series_title,
+            -- A series is subscribable like a read list or a collection.
+            sub_kind = "series",
+            sub_id = series_id,
+            sub_name = series_title,
         },
     }
 end
@@ -834,6 +886,11 @@ function KomixBrowser:showSeriesInCollection(collection_id, collection_name)
         item_builder = function(series) return self:seriesItem(series) end,
         cover_type = "series",
         empty_text = "No series in collection",
+        push_opts = {
+            sub_kind = "collection",
+            sub_id = collection_id,
+            sub_name = collection_name,
+        },
     }
 end
 
@@ -875,6 +932,11 @@ function KomixBrowser:showBooksInReadList(readlist_id, readlist_name)
         end,
         cover_type = "book",
         empty_text = "No books found",
+        push_opts = {
+            sub_kind = "readlist",
+            sub_id = readlist_id,
+            sub_name = readlist_name,
+        },
     }
 end
 

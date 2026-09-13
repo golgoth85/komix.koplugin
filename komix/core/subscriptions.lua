@@ -16,6 +16,11 @@ local Removals = require("komix/core/removals")
 local PAGE_SIZE = 100
 local MAX_PAGES = 200
 
+-- Things that can be subscribed to. A whole series behaves like a read list or
+-- a collection: everything it contains is downloaded and kept up to date.
+local KINDS = { readlist = true, collection = true, series = true }
+local function isKind(kind) return KINDS[kind] == true end
+
 local Subscriptions = {}
 Subscriptions.__index = Subscriptions
 
@@ -37,7 +42,7 @@ function Subscriptions:isEmpty()
 end
 
 function Subscriptions:add(kind, id, name)
-    if not id or (kind ~= "readlist" and kind ~= "collection") then return false end
+    if not id or not isKind(kind) then return false end
     local subs = self.plugin.settings.subscriptions or {}
     for _, s in ipairs(subs) do
         if s.kind == kind and s.id == id then return false end
@@ -114,6 +119,12 @@ function Subscriptions:collectBooks(sub)
                     for _, b in ipairs(content) do table.insert(books, b) end
                 end)
             end
+        end)
+    elseif sub.kind == "series" then
+        paginate(function(page)
+            return api:get_books_for_series(sub.id, nil, page, PAGE_SIZE)
+        end, function(content)
+            for _, b in ipairs(content) do table.insert(books, b) end
         end)
     end
 

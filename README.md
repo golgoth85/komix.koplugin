@@ -60,9 +60,11 @@ offline queue, background pre-download of upcoming chapters, automatic RTL.
 If a chapter has no description, the **series** description is used instead (optional). Authors to
 save are selectable: **artist only** (default), writer only, both, or none.
 
-**Category subscriptions** — subscribe to one or more read lists / collections; new books added on
-Komga are downloaded automatically. Runs **manually** (home entry, menu, or quick action) and
-**automatically** when the network comes back.
+**Subscriptions** — subscribe to read lists, collections or a whole **series**; new books added on
+Komga are downloaded automatically. Subscribe and unsubscribe from the catalog itself: the
+top-left menu of a collection / read list / series has a *Subscribe* / *Unsubscribe* entry.
+Runs **manually** (home entry, menu, or quick action) and **automatically** when the network
+comes back.
 
 Comics that leave a subscription are noticed too: the sync asks once, listing the series and the
 files, whether the local copies should be deleted as well (**Delete** / **Keep**). Only those
