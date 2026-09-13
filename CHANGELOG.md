@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.0.6] - 2026-09-13
+
+### Added
+- **Local files of comics removed from a subscription are no longer orphaned**: a sync now
+  notices the comics that were in a subscribed read list or collection last time, are gone from
+  the server now, and are still on the device. It asks once, listing the series and files, with
+  **Delete** / **Keep**. Only the files of those comics are removed — a series folder is deleted
+  only when it is left empty, and the other volumes are never touched.
+- **"Don't ask again (always keep local files)"** checkbox in that dialog: ticking it and
+  answering *Keep* turns the check off for good.
+- **Subscriptions → "Offer to delete comics removed from subscriptions"** menu option, on by
+  default. Turning it off disables the check entirely, so nothing is ever deleted locally by a
+  sync. Removing a subscription forgets its comics instead of prompting about them.
+
+### Notes
+- The check only covers comics downloaded by a subscription; books downloaded by hand are never
+  proposed for deletion. The set of comics each subscription holds is refreshed on every sync
+  (also when the check is off), so re-enabling it never proposes deletions for books that
+  disappeared long ago.
+
 ## [1.0.5] - 2026-09-13
 
 ### Fixed

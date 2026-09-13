@@ -298,6 +298,17 @@ function KomixMenu:createSettingsMenu()
                     end,
                 },
                 {
+                    -- Off = no check at all, so nothing is ever deleted locally.
+                    text = _("Offer to delete comics removed from subscriptions"),
+                    checked_func = function() return self.plugin.settings.subscriptions_check_removed end,
+                    keep_menu_open = true,
+                    callback = function()
+                        self.plugin.settings.subscriptions_check_removed =
+                            not self.plugin.settings.subscriptions_check_removed
+                        self.plugin:saveSettings()
+                    end,
+                },
+                {
                     text = _("Add read list"),
                     keep_menu_open = true,
                     callback = function() self:pickSubscription("readlist") end,

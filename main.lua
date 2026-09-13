@@ -66,7 +66,11 @@ local DEFAULT_SETTINGS = {
     metadata_summary_from_series = true,
     -- Category subscriptions:
     subscriptions = {},
-    auto_sync_subscriptions = true
+    auto_sync_subscriptions = true,
+    -- Ask before deleting local files for comics that left a subscription.
+    subscriptions_check_removed = true,
+    -- What each subscription held at the end of the last sync (kind:id -> books).
+    subscription_known = {}
 }
 
 function Komix:init()

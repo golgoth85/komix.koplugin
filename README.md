@@ -64,6 +64,13 @@ save are selectable: **artist only** (default), writer only, both, or none.
 Komga are downloaded automatically. Runs **manually** (home entry, menu, or quick action) and
 **automatically** when the network comes back.
 
+Comics that leave a subscription are noticed too: the sync asks once, listing the series and the
+files, whether the local copies should be deleted as well (**Delete** / **Keep**). Only those
+files go — a series folder is removed only when it is left empty, so the other volumes are never
+touched. A **"Don't ask again"** checkbox in the dialog, and the equivalent option under
+**Subscriptions**, turn the check off entirely, in which case a sync never deletes anything
+locally.
+
 ## Install
 
 **Manual:** copy the `komix.koplugin` folder into `koreader/plugins/` (or unzip
@@ -95,8 +102,10 @@ Honest picture:
 - **Verified on real KOReader** (Linux x86_64 build, headless, driven with a mock Komga server that
   serves covers and a fake catalogue): browsing, covers, search, download with progress bar,
   pause (progress actually freezes) / resume / cancel (partial file removed) / hide + recall from
-  "Active downloads", metadata, counts, badges, and the subscription logic. The test suite is 100+
-  assertions and is run with KOReader's own LuaJIT.
+  "Active downloads", metadata, counts, badges, the subscription logic, and the removal prompt
+  (Delete removes the file and its sidecar while the other volumes stay, the "don't ask again"
+  box turns the check off). The test suite is 150+ assertions and is run with KOReader's own
+  LuaJIT.
 - **Downloaded files were checked** for integrity, and the metadata sidecars were inspected
   (series-description fallback and the "artist only" author filter both behave as intended).
 - **Not yet tested on physical devices.** Gestures, RTL, suspend/resume and large downloads on a
