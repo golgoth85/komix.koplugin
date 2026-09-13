@@ -9,3 +9,11 @@
 
 # Sidecar / cache locali di KOReader
 *.sdr/
+
+# Credenziali: non devono MAI finire nel repo, nemmeno per errore
+.gh_token
+*.token
+*.pat
+.env
+.env.*
+
