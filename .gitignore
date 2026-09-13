@@ -1,0 +1,11 @@
+# Artefatti di build (lo zip va allegato alle release, non committato)
+*.koplugin.zip
+
+# Backup e temporanei
+*.bak
+*.bak-*
+*~
+.DS_Store
+
+# Sidecar / cache locali di KOReader
+*.sdr/
