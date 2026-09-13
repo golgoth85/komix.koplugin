@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.0.5] - 2026-09-13
+
+### Fixed
+- **A minimized download window no longer pops back up**: hiding the window now keeps it hidden
+  for the rest of the queue, so a subscription sync with dozens of books doesn't reopen it on
+  every file. It comes back only when asked (**komix → Active downloads**), or on the next
+  download started after the queue has drained.
+- **Progress line off-centre**: the byte/percentage line was drawn at the offset of the previous
+  (shorter) text, so it ended up pushed to the side as the numbers grew. The layout is now
+  recomputed on every update, and the line uses the same font as the book name.
+
 ## [1.0.4] - 2026-09-13
 
 ### Added

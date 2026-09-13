@@ -43,6 +43,7 @@ function KomixSync:new(plugin)
         queue = {},              -- downloads waiting for the current one to end
         current = nil,           -- { book, paths, pid, paused, dialog, ... }
         cancel_sequence = false, -- set by cancel, consumed by downloadBooksSeq
+        minimized = false,       -- user hid the window: don't pop it back up
     }
     return setmetatable(o, { __index = self })
 end
@@ -901,7 +902,12 @@ end
 function KomixSync:_pumpQueue()
     if self.current then return end
     local rec = table.remove(self.queue, 1)
-    if not rec then return end
+    if not rec then
+        -- Queue drained: the next download will be a fresh user action, so let
+        -- the window show up again.
+        self.minimized = false
+        return
+    end
     self:_startDownload(rec)
 end
 
@@ -941,7 +947,11 @@ function KomixSync:_startDownload(rec)
     self.current = rec
     UIManager:preventStandby()
 
-    self:_showDialog(rec)
+    -- When the user has hidden the window, queued downloads keep running
+    -- silently; the window comes back only on request (Active downloads).
+    if not self.minimized then
+        self:_showDialog(rec)
+    end
     self:_schedulePoll()
 end
 
@@ -1088,6 +1098,7 @@ function KomixSync:cancelCurrent()
     self.current = nil
     self.cancel_sequence = true
     self.queue = {}
+    self.minimized = false
     UIManager:allowStandby()
 
     if rec.dialog then
@@ -1118,6 +1129,7 @@ end
 function KomixSync:minimizeCurrent()
     local rec = self.current
     if not rec then return end
+    self.minimized = true
     if rec.dialog then
         rec.dialog:close()
         rec.dialog = nil
@@ -1133,6 +1145,8 @@ function KomixSync:showActiveDownloads()
         self.plugin:notify(_("No active downloads"), "info")
         return
     end
+    -- Asking for the window means we want to keep seeing it.
+    self.minimized = false
     if rec.dialog then
         rec.dialog:refresh()
         return

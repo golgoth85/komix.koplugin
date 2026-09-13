@@ -43,6 +43,7 @@ function DownloadDialog:init()
 
     local bar_width = Screen:getWidth() - Screen:scaleBySize(80)
     local group = VerticalGroup:new{ align = "center" }
+    self.group = group
 
     if self.title then
         table.insert(group, TextWidget:new{
@@ -74,9 +75,11 @@ function DownloadDialog:init()
         table.insert(group, self.progress_bar)
     end
 
+    -- Same face as the subtitle: the byte/percentage line reads as a caption to
+    -- the book name, not as a separate heading.
     self.status_widget = TextWidget:new{
         text = self.status or "",
-        face = Font:getFace("smallinfofont"),
+        face = Font:getFace("smallffont"),
         max_width = bar_width,
     }
     table.insert(group, self.status_widget)
@@ -160,6 +163,10 @@ function DownloadDialog:setStatus(text)
     if not self.status_widget or self._status == text then return end
     self._status = text
     self.status_widget:setText(text)
+    -- A TextWidget's width follows its text, and the enclosing group caches
+    -- each child's width: without resetting it the line is drawn at the offset
+    -- of the previous (shorter) text and ends up off-centre.
+    if self.group then self.group:resetLayout() end
     self:refresh()
 end
 
