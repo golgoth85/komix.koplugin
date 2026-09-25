@@ -22,6 +22,8 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Validate request
         id: request
@@ -34,7 +36,7 @@ jobs:
           branch="$(grep -E '^branch=' "$request" | tail -1 | cut -d= -f2- || true)"
           expected_head="$(grep -E '^expected_head=' "$request" | tail -1 | cut -d= -f2- || true)"
           case "$operation" in
-            inspect|publish_branch) ;;
+            inspect|inspect_runtime|publish_branch) ;;
             *) echo "Unsupported operation: $operation" >&2; exit 2 ;;
           esac
           if [[ "$operation" == publish_branch ]]; then
@@ -46,13 +48,15 @@ jobs:
           echo "branch=$branch" >> "$GITHUB_OUTPUT"
           echo "expected_head=$expected_head" >> "$GITHUB_OUTPUT"
 
-      - name: Inspect NAS local checkout
+      - name: Inspect NAS technical checkout
         id: nas
+        env:
+          GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
           repo='/nas/repo'
-          if [[ ! -d "$repo/.git" ]]; then
+          if ! git -C "$repo" rev-parse --git-dir >/dev/null 2>&1; then
             echo "nas_local_repo=NOT_MOUNTED"
             echo "mounted=false" >> "$GITHUB_OUTPUT"
             echo "clean=false" >> "$GITHUB_OUTPUT"
@@ -67,11 +71,15 @@ jobs:
           echo "nas_current_branch=$current_branch"
           echo "nas_current_head=$current_head"
           echo "nas_origin=$remote"
+
           if [[ -z "$current_branch" ]]; then
             github_branch_head=""
             sync_state="DETACHED"
           else
-            remote_line="$(git ls-remote origin "refs/heads/$current_branch" 2>/dev/null || true)"
+            auth="$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
+            remote_line="$(
+              git -c http.extraheader="AUTHORIZATION: basic $auth"                 ls-remote "https://github.com/${GITHUB_REPOSITORY}.git"                 "refs/heads/$current_branch" 2>/dev/null || true
+            )"
             github_branch_head="$(printf '%s\n' "$remote_line" | awk '{print $1}')"
             if [[ -z "$remote_line" ]]; then
               sync_state="LOCAL_ONLY_OR_REMOTE_UNAVAILABLE"
@@ -81,6 +89,7 @@ jobs:
               sync_state="DRIFT"
             fi
           fi
+
           echo "github_branch_head=${github_branch_head:-NONE}"
           echo "nas_github_sync=$sync_state"
           if [[ -n "$porcelain" ]]; then
@@ -92,6 +101,44 @@ jobs:
           echo "current_branch=$current_branch" >> "$GITHUB_OUTPUT"
           echo "current_head=$current_head" >> "$GITHUB_OUTPUT"
           if [[ -n "$porcelain" ]]; then echo "clean=false" >> "$GITHUB_OUTPUT"; else echo "clean=true" >> "$GITHUB_OUTPUT"; fi
+
+      - name: Verify real runtime checkout integrity
+        if: steps.request.outputs.operation == 'inspect_runtime'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          repo='/nas/runtime'
+          git -C "$repo" rev-parse --git-dir >/dev/null 2>&1 || {
+            echo "runtime_checkout=NOT_MOUNTED_OR_NOT_GIT" >&2
+            exit 8
+          }
+          git config --global --add safe.directory "$repo"
+          branch="$(git -C "$repo" branch --show-current)"
+          head="$(git -C "$repo" rev-parse HEAD)"
+          porcelain="$(git -C "$repo" status --porcelain=v1)"
+          remote="$(git -C "$repo" remote get-url origin 2>/dev/null || true)"
+          echo "runtime_branch=${branch:-DETACHED}"
+          echo "runtime_head=$head"
+          echo "runtime_origin=$remote"
+          [[ -n "$branch" ]] || { echo "runtime_sync=DETACHED" >&2; exit 8; }
+          [[ -z "$porcelain" ]] || {
+            echo "runtime_sync=DIRTY"
+            printf '%s\n' "$porcelain"
+            exit 8
+          }
+          auth="$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
+          remote_head="$(
+            git -c http.extraheader="AUTHORIZATION: basic $auth"               ls-remote "https://github.com/${GITHUB_REPOSITORY}.git"               "refs/heads/$branch" | awk '{print $1}'
+          )"
+          [[ -n "$remote_head" ]] || { echo "runtime_sync=LOCAL_ONLY_OR_REMOTE_UNAVAILABLE" >&2; exit 8; }
+          [[ "$remote_head" == "$head" ]] || {
+            echo "runtime_sync=DRIFT remote=$remote_head local=$head" >&2
+            exit 8
+          }
+          echo "runtime_sync=IN_SYNC"
+          echo "runtime_worktree=CLEAN"
 
       - name: Publish exact committed local branch
         if: steps.request.outputs.operation == 'publish_branch'
@@ -119,15 +166,21 @@ jobs:
           git -C "$scratch" checkout --detach "$EXPECTED_HEAD"
           [[ "$(git -C "$scratch" rev-parse HEAD)" == "$EXPECTED_HEAD" ]] || { echo "Scratch SHA mismatch." >&2; exit 5; }
 
-          remote_before="$(git ls-remote "https://github.com/golgoth85/komix.koplugin.git" "refs/heads/$REQUEST_BRANCH" | awk '{print $1}')"
+          auth="$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
+          remote_url="https://github.com/${GITHUB_REPOSITORY}.git"
+          remote_before="$(
+            git -c http.extraheader="AUTHORIZATION: basic $auth"               ls-remote "$remote_url" "refs/heads/$REQUEST_BRANCH" | awk '{print $1}'
+          )"
           if [[ -n "$remote_before" && "$remote_before" != "$EXPECTED_HEAD" ]]; then
             echo "Remote branch differs: $remote_before; no force-push attempted." >&2
             exit 6
           fi
           if [[ "$remote_before" != "$EXPECTED_HEAD" ]]; then
-            git -C "$scratch" push "https://x-access-token:$GH_TOKEN@github.com/golgoth85/komix.koplugin.git" "$EXPECTED_HEAD:refs/heads/$REQUEST_BRANCH"
+            git -c http.extraheader="AUTHORIZATION: basic $auth"               -C "$scratch" push "$remote_url" "$EXPECTED_HEAD:refs/heads/$REQUEST_BRANCH"
           fi
-          remote_after="$(git ls-remote "https://github.com/golgoth85/komix.koplugin.git" "refs/heads/$REQUEST_BRANCH" | awk '{print $1}')"
+          remote_after="$(
+            git -c http.extraheader="AUTHORIZATION: basic $auth"               ls-remote "$remote_url" "refs/heads/$REQUEST_BRANCH" | awk '{print $1}'
+          )"
           [[ "$remote_after" == "$EXPECTED_HEAD" ]] || { echo "Remote verification failed." >&2; exit 7; }
           echo "published_branch=$REQUEST_BRANCH"
           echo "published_sha=$remote_after"
