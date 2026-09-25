@@ -70,7 +70,8 @@ jobs:
           echo "nas_local_repo=MOUNTED_READ_ONLY"
           echo "nas_current_branch=$current_branch"
           echo "nas_current_head=$current_head"
-          echo "nas_origin=$remote"
+          safe_remote="$(printf '%s' "$remote" | sed -E 's#https://[^/@]+@github\\.com/#https://github.com/#')"
+          echo "nas_origin=$safe_remote"
 
           if [[ -z "$current_branch" ]]; then
             github_branch_head=""
@@ -121,7 +122,8 @@ jobs:
           remote="$(git -C "$repo" remote get-url origin 2>/dev/null || true)"
           echo "runtime_branch=${branch:-DETACHED}"
           echo "runtime_head=$head"
-          echo "runtime_origin=$remote"
+          safe_remote="$(printf '%s' "$remote" | sed -E 's#https://[^/@]+@github\\.com/#https://github.com/#')"
+          echo "runtime_origin=$safe_remote"
           [[ -n "$branch" ]] || { echo "runtime_sync=DETACHED" >&2; exit 8; }
           [[ -z "$porcelain" ]] || {
             echo "runtime_sync=DIRTY"
