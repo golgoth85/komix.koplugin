@@ -1,0 +1,84 @@
+name: Publish plugin release
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Read plugin version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="$(sed -n 's/^[[:space:]]*version[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' _meta.lua | head -1)"
+          test -n "$VERSION"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Package Komix
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf dist
+          mkdir -p dist/komix.koplugin
+          find . -mindepth 1 -maxdepth 1 \
+            ! -name '.git' \
+            ! -name '.github' \
+            ! -name 'dist' \
+            -exec cp -a {} dist/komix.koplugin/ \;
+          test -f dist/komix.koplugin/_meta.lua
+          test -f dist/komix.koplugin/main.lua
+          test -d dist/komix.koplugin/komix
+          (
+            cd dist
+            zip -qr komix.koplugin.zip komix.koplugin
+          )
+          unzip -t dist/komix.koplugin.zip >/dev/null
+
+      - name: Extract release notes from changelog
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          awk -v version="$VERSION" '
+            index($0, "## [" version "] - ") == 1 { in_release=1; next }
+            in_release && /^## \[/ { exit }
+            in_release { print }
+          ' CHANGELOG.md > RELEASE_NOTES.md
+          grep -q '[^[:space:]]' RELEASE_NOTES.md
+
+      - name: Publish new release or verify existing one
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+          VERSION: ${{ steps.version.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            asset_count="$(
+              gh release view "$TAG" --json assets \
+                --jq '[.assets[] | select(.name == "komix.koplugin.zip")] | length'
+            )"
+            test "$asset_count" = "1"
+            echo "Release $TAG already exists with the expected asset; no mutation."
+            exit 0
+          fi
+          gh release create "$TAG" dist/komix.koplugin.zip \
+            --target "$GITHUB_SHA" \
+            --title "Komix $VERSION" \
+            --notes-file RELEASE_NOTES.md
