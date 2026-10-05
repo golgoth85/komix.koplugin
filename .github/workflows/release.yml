@@ -2,8 +2,8 @@ name: Publish plugin release
 
 on:
   push:
-    branches:
-      - main
+    tags:
+      - 'v*'
   workflow_dispatch:
 
 permissions:
