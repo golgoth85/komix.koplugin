@@ -139,3 +139,10 @@ The hardened control agent can perform controlled Docker list/inspect/logs/start
 - Untrusted PR/source code must not execute directly on persistent credential-bearing self-hosted runners. Use the disposable I3 sandbox.
 - Release/publish/deploy jobs requiring credentials are a separate trusted boundary and do not replace Local CI validation.
 - New application repositories must be registered in the Local CI repository registry and contain `LOCAL_CI.md` before CI is considered configured.
+
+## NAS folders: production vs development
+
+- Production / live runtime: /koreader/plugins/komix.koplugin.
+- Development checkout (reference clone, canonical remote `git@github.com:golgoth85/komix.koplugin.git`): `/workspace/komix.koplugin-source`.
+- Never edit the production folder directly. Develop in the `-source` clone (or in an isolated task workspace opened with `cloudcli-workspace open`, where the repository policy requires it), publish a branch, open a PR, and deploy only through the authorized deployment path.
+- `/workspace/legacy-home` is an archived folder (backup in `/home/runtime/backups/20261015/`); do not develop there.
