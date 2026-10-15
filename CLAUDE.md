@@ -9,3 +9,5 @@ Project-specific behavior is defined by the repository code, README/docs, and an
 ## Mandatory Local CI policy
 
 For ordinary development testing and validation, this repository follows `LOCAL_CI.md` and `golgoth85/local-ci-lab/docs/LOCAL-CI-ADOPTION-POLICY.md`. Local CI is the default. Do not silently introduce or restore automatic GitHub-hosted development CI. Retained hosted workflows are manual fallback only during migration. Untrusted source must execute only inside the disposable I3 sandbox, never directly on a persistent credential-bearing runner. Release/publish/deploy with credentials remains a separate trusted boundary.
+
+> Cartelle sul NAS (produzione vs sviluppo `/workspace/komix.koplugin-source`): vedi la sezione "NAS folders" in `AGENTS.md`.
