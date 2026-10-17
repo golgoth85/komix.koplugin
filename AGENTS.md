@@ -15,5 +15,11 @@ Client [Komga](https://komga.org) per KOReader: sfoglia la libreria, cerca, scar
 - Sviluppo sul clone `-source`, mai nella cartella di produzione: branch, PR, poi copia sul runtime.
 - Local CI: profilo `profile-pending` (vedi `LOCAL_CI.md`), facoltativa e non bloccante; nessuna CI GitHub-hosted automatica. Il codice non attendibile non gira su runner persistenti con credenziali. Regime semplificato del 2026-10-17: vedi «Deploy e controlli» in `/workspace/AGENTS.md`.
 
+## Zone delicate
+
+Toccare queste parti **non** si annulla con un semplice revert: prima backup o prova su una copia; se non basta, PR e review consigliata al proprietario (regola «Quanto rigore» in `/workspace/AGENTS.md`). Tutto il resto: si va dritti.
+- Sincronizzazione dei progressi verso Komga (scrive sul server reale) e cancellazione dei download sul dispositivo.
+- Pubblicazione di una release o degli store (versione in `_meta.lua`): la scaricano i dispositivi.
+
 ## Documenti
 `README.md`, `CHANGELOG.md`, `ROADMAP.md`, `LOCAL_CI.md`.
