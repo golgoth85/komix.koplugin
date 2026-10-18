@@ -1,6 +1,6 @@
 # komix
 
-Contesto generale (infrastruttura, GitHub, regole operative): `/workspace/AGENTS.md`. Ambiente di sviluppo e collaudo headless: repo `koreader` (`/workspace/koreader-source`).
+Regole generali (infrastruttura, GitHub, deploy, zone delicate): `/workspace/AGENTS.md`. Ambiente di sviluppo e collaudo headless: repo `koreader` (`/workspace/koreader-source`).
 
 ## Scopo
 Client [Komga](https://komga.org) per KOReader: sfoglia la libreria, cerca, scarica i libri in locale e sincronizza i progressi di lettura, con abbonamenti a categorie, collezioni, liste di lettura e serie. Pensato per lettori e-ink (provato su Kindle Scribe 10,2" e Kobo Libra 2). Nasce dalla fusione dei plugin `kokomga` (MIT) e `komga` (AGPL-3.0-or-later) con funzioni aggiunte; il codice derivato dal secondo mantiene licenza, header SPDX e attribuzione.
@@ -13,11 +13,9 @@ Client [Komga](https://komga.org) per KOReader: sfoglia la libreria, cerca, scar
 
 ## Regole
 - Sviluppo sul clone `-source`, mai nella cartella di produzione: branch, PR, poi copia sul runtime.
-- Local CI: profilo `profile-pending` (vedi `LOCAL_CI.md`), facoltativa e non bloccante; nessuna CI GitHub-hosted automatica. Il codice non attendibile non gira su runner persistenti con credenziali. Regime semplificato del 2026-10-17: vedi «Deploy e controlli» in `/workspace/AGENTS.md`.
+- Local CI: profilo `profile-pending` (vedi `LOCAL_CI.md`), facoltativa e non bloccante; nessuna CI GitHub-hosted automatica. Il codice non attendibile non gira su runner persistenti con credenziali.
 
 ## Zone delicate
-
-Toccare queste parti **non** si annulla con un semplice revert: prima backup o prova su una copia; se non basta, PR e review consigliata al proprietario (regola «Quanto rigore» in `/workspace/AGENTS.md`). Tutto il resto: si va dritti.
 - Sincronizzazione dei progressi verso Komga (scrive sul server reale) e cancellazione dei download sul dispositivo.
 - Pubblicazione di una release o degli store (versione in `_meta.lua`): la scaricano i dispositivi.
 
